@@ -33,18 +33,18 @@ from bs4 import BeautifulSoup
 # Add or edit entries here to scrape additional anime.
 SERIES = [
     {
-        "slug":        "naruto",
-        "total_eps":   220,
-        "mal_id":      20,       # https://myanimelist.net/anime/20
-        "tmdb_id":     46260,    # https://www.themoviedb.org/tv/46260
-        "output_file": "naruto.json",
+        "slug":        "one-piece",
+        "total_eps":   1168,
+        "mal_id":      21,       # https://myanimelist.net/anime/21
+        "tmdb_id":     37854,    # https://www.themoviedb.org/tv/37854
+        "output_file": "one_piece.json",
     },
     {
-        "slug":        "naruto-shippuden",
-        "total_eps":   500,
-        "mal_id":      1735,     # https://myanimelist.net/anime/1735
-        "tmdb_id":     31910,    # https://www.themoviedb.org/tv/31910
-        "output_file": "naruto_shippuden.json",
+        "slug":        "death-note",
+        "total_eps":   37,
+        "mal_id":      1535,     # https://myanimelist.net/anime/1535
+        "tmdb_id":     13916,    # https://www.themoviedb.org/tv/13916
+        "output_file": "death_note.json",
     },
 ]
 
