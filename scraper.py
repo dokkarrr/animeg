@@ -33,18 +33,18 @@ from bs4 import BeautifulSoup
 # Add or edit entries here to scrape additional anime.
 SERIES = [
     {
-        "slug":        "one-piece",
-        "total_eps":   1168,
-        "mal_id":      21,       # https://myanimelist.net/anime/21
-        "tmdb_id":     37854,    # https://www.themoviedb.org/tv/37854
-        "output_file": "one_piece.json",
+        "slug":        "rurouni-kenshin",
+        "total_eps":   95,
+        "mal_id":      45,       # https://myanimelist.net/anime/45
+        "tmdb_id":     28136,    # https://www.themoviedb.org/tv/28136
+        "output_file": "rurouni_kenshin.json",
     },
     {
-        "slug":        "death-note",
-        "total_eps":   37,
-        "mal_id":      1535,     # https://myanimelist.net/anime/1535
-        "tmdb_id":     13916,    # https://www.themoviedb.org/tv/13916
-        "output_file": "death_note.json",
+        "slug":        "hunter-x-hunter-2011",
+        "total_eps":    148,
+        "mal_id":      11061,     # https://myanimelist.net/anime/11061
+        "tmdb_id":      46298,    # https://www.themoviedb.org/tv/ 46298
+        "output_file": "hunter-x-hunter-2011.json",
     },
 ]
 
