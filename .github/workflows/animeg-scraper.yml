@@ -109,7 +109,7 @@ jobs:
         env:
           SCRAPER_START: ${{ env.SCRAPER_START }}
           SCRAPER_END:   ${{ env.SCRAPER_END }}
-        run: python scraper.py
+        run: python animeg-scraper.py
 
       # ── 6. Summary ────────────────────────────────────────
       - name: Show summary
