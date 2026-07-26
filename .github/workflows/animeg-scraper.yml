@@ -1,0 +1,148 @@
+name: AnimeGG Scraper
+
+on:
+  # Auto-run every day at 02:00 UTC
+  schedule:
+    - cron: "0 2 * * *"
+
+  # ── Manual trigger ──────────────────────────────────────
+  workflow_dispatch:
+    inputs:
+      start_page:
+        description: |
+          START page number  (e.g. 1, 20, 500)
+          Page N = ?start=N×10
+          Leave blank → auto-resume from last saved position
+        required: false
+        default: ""
+      end_page:
+        description: |
+          END page number  (e.g. 10, 59, 6500)
+          Leave blank → start_page + 999  (1 000 pages / 10 000 URLs)
+          Max allowed: 6500
+        required: false
+        default: ""
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+
+      # ── 1. Checkout ───────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # ── 2. Python ─────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ── 3. Dependencies ───────────────────────────────────
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4
+
+      # ── 4. Resolve page range ─────────────────────────────
+      #   Writes SCRAPER_START and SCRAPER_END to $GITHUB_ENV
+      #   so the scraper receives the exact range the user set.
+      - name: Resolve page range
+        env:
+          INPUT_START: ${{ github.event.inputs.start_page }}
+          INPUT_END:   ${{ github.event.inputs.end_page }}
+          EVENT_NAME:  ${{ github.event_name }}
+        run: |
+          python - <<'PYEOF'
+          import os, json
+
+          MAX_PAGE     = 6500
+          PAGES_PER_RUN = 1000
+          DATA_DIR     = "data"
+          STATE_FILE   = os.path.join(DATA_DIR, "state.json")
+          os.makedirs(DATA_DIR, exist_ok=True)
+
+          event      = os.environ.get("EVENT_NAME", "schedule")
+          raw_start  = os.environ.get("INPUT_START", "").strip()
+          raw_end    = os.environ.get("INPUT_END",   "").strip()
+
+          # ── Load saved state ──────────────────────────────
+          state = {"next_page": 0, "part": 1, "total_urls": 0}
+          if os.path.exists(STATE_FILE):
+              with open(STATE_FILE) as f:
+                  state = json.load(f)
+
+          # ── Resolve start ─────────────────────────────────
+          if raw_start != "":
+              start = int(raw_start)
+              print(f"[range] Manual start_page = {start}")
+          else:
+              start = state.get("next_page", 0)
+              print(f"[range] Auto-resume start_page = {start}")
+
+          # ── Resolve end ───────────────────────────────────
+          if raw_end != "":
+              end = int(raw_end)
+              print(f"[range] Manual end_page = {end}")
+          else:
+              end = start + PAGES_PER_RUN - 1
+              print(f"[range] Auto end_page = {end}  (start + {PAGES_PER_RUN} - 1)")
+
+          # ── Safety clamp ──────────────────────────────────
+          start = max(0, min(start, MAX_PAGE))
+          end   = max(start, min(end, MAX_PAGE))
+
+          print(f"[range] Final: pages {start} → {end}  "
+                f"(URLs ?start={start*10} → ?start={end*10})")
+
+          # ── Export to GitHub env ──────────────────────────
+          with open(os.environ["GITHUB_ENV"], "a") as gh:
+              gh.write(f"SCRAPER_START={start}\n")
+              gh.write(f"SCRAPER_END={end}\n")
+          PYEOF
+
+      # ── 5. Run scraper ────────────────────────────────────
+      - name: Run scraper
+        env:
+          SCRAPER_START: ${{ env.SCRAPER_START }}
+          SCRAPER_END:   ${{ env.SCRAPER_END }}
+        run: python scraper.py
+
+      # ── 6. Summary ────────────────────────────────────────
+      - name: Show summary
+        run: |
+          echo "───────────── data/ ─────────────"
+          ls -lh data/
+          echo ""
+          echo "───────────── index.json ─────────"
+          cat data/index.json 2>/dev/null || echo "(not yet created)"
+          echo ""
+          echo "───────────── state.json ─────────"
+          cat data/state.json 2>/dev/null || echo "(not yet created)"
+
+      # ── 7. Commit & push ─────────────────────────────────
+      - name: Commit and push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add data/
+          git diff --cached --quiet && echo "No changes — nothing to commit." && exit 0
+
+          TOTAL=$(python -c "
+          import json, os
+          f = 'data/index.json'
+          print(sum(i['entries'] for i in json.load(open(f))) if os.path.exists(f) else '?')
+          ")
+          NEXT=$(python -c "
+          import json, os
+          f = 'data/state.json'
+          print('page ' + str(json.load(open(f)).get('next_page','?')) if os.path.exists(f) else 'fresh')
+          ")
+          RANGE="pages ${{ env.SCRAPER_START }}→${{ env.SCRAPER_END }}"
+
+          git commit -m "🤖 scrape | ${RANGE} | total ${TOTAL} URLs | next ${NEXT}"
+          git push
