@@ -2,8 +2,8 @@ name: AnimeGG Scraper
 
 on:
   # Auto-run every day at 02:00 UTC
-  schedule:
-    - cron: "0 2 * * *"
+ # schedule:
+  #  - cron: "0 2 * * *"
 
   # ── Manual trigger ──────────────────────────────────────
   workflow_dispatch:
