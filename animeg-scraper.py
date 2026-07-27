@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
-AnimeGG Scraper — GitHub Actions Edition
+AnimeGG Scraper - GitHub Actions Edition
 - Reads SCRAPER_START / SCRAPER_END from env (set by workflow)
 - Auto-resumes via data/state.json when env vars not set
-- Auto-splits JSON at 3 MB → animeg_part_1.json, animeg_part_2.json …
+- Auto-splits JSON at 3 MB -> animeg_part_1.json, animeg_part_2.json ...
 - Saves data/index.json listing all parts
+- Stores series page URLs (not episode URLs); only unique URLs kept
+- Persists processed URLs to data/already_processed_page_urls_list.json for fast dedup
 """
 
+import re
 import requests
 from bs4 import BeautifulSoup
 import json
@@ -14,19 +17,35 @@ import time
 import os
 import sys
 
-# ─── Constants ────────────────────────────────────────────
+# Constants
 BASE_URL      = "https://www.animegg.org"
 DATA_DIR      = "data"
 STATE_FILE    = os.path.join(DATA_DIR, "state.json")
 INDEX_FILE    = os.path.join(DATA_DIR, "index.json")
+PROCESSED_FILE = os.path.join(DATA_DIR, "already_processed_page_urls_list.json")
 MAX_PAGE      = 6500
 MAX_FILE_SIZE = 3 * 1024 * 1024   # 3 MB
 PAGES_PER_RUN = 1000              # default when no end given
 DELAY         = 1.2               # seconds between requests
-# ──────────────────────────────────────────────────────────
+
+# Matches "-episode-5", "-episode-14", "-episode-5-5", etc. at end of slug
+_EP_RE = re.compile(r"-episode(?:-[\d]+)+$", re.IGNORECASE)
 
 
-# ── State ─────────────────────────────────────────────────
+def to_series_url(episode_href: str) -> str:
+    """
+    Convert an episode URL into its series page URL.
+
+    https://www.animegg.org/the-cat-and-the-dragon-episode-5#subbed
+      -> https://www.animegg.org/series/the-cat-and-the-dragon#episodes
+    """
+    url  = episode_href.split("#")[0].rstrip("/")   # drop #fragment
+    slug = url.rsplit("/", 1)[-1]                   # last path segment
+    slug = _EP_RE.sub("", slug)                     # strip -episode-N
+    return f"{BASE_URL}/series/{slug}#episodes"
+
+
+# State
 
 def load_state():
     if os.path.exists(STATE_FILE):
@@ -40,7 +59,7 @@ def save_state(state):
         json.dump(state, f, indent=2)
 
 
-# ── Part files ────────────────────────────────────────────
+# Part files
 
 def part_path(n):
     return os.path.join(DATA_DIR, f"animeg_part_{n}.json")
@@ -62,14 +81,13 @@ def part_size(n):
     return os.path.getsize(p) if os.path.exists(p) else 0
 
 def estimated_size(data):
-    """Fast size estimate without full JSON dump every time."""
     return sum(
-        len(e["episode_title"].encode()) + len(e["episode_href"].encode()) + 40
+        len(e["series_title"].encode()) + len(e["series_href"].encode()) + 40
         for e in data
     )
 
 
-# ── Index ─────────────────────────────────────────────────
+# Index
 
 def update_index(parts):
     entries = []
@@ -80,10 +98,10 @@ def update_index(parts):
         with open(p, encoding="utf-8") as f:
             data = json.load(f)
         entries.append({
-            "part":        n,
-            "file":        f"animeg_part_{n}.json",
-            "entries":     len(data),
-            "size_bytes":  os.path.getsize(p),
+            "part":         n,
+            "file":         f"animeg_part_{n}.json",
+            "entries":      len(data),
+            "size_bytes":   os.path.getsize(p),
             "serial_range": [
                 data[0]["serial_no"]  if data else None,
                 data[-1]["serial_no"] if data else None,
@@ -95,7 +113,27 @@ def update_index(parts):
     print(f"[index] {len(entries)} parts | {total} total entries")
 
 
-# ── HTTP ──────────────────────────────────────────────────
+# Processed-URL registry
+#
+# data/already_processed_page_urls_list.json is a JSON array of every
+# series_href that has already been saved.  It is the single source of
+# truth for deduplication — no need to re-scan all part files on startup.
+
+def load_processed_urls() -> set:
+    """Load the persisted set of already-processed series URLs."""
+    if os.path.exists(PROCESSED_FILE):
+        with open(PROCESSED_FILE, encoding="utf-8") as f:
+            return set(json.load(f))
+    return set()
+
+def save_processed_urls(seen: set) -> None:
+    """Persist the full set of processed URLs to disk (sorted for readability)."""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(PROCESSED_FILE, "w", encoding="utf-8") as f:
+        json.dump(sorted(seen), f, ensure_ascii=False, indent=2)
+
+
+# HTTP
 
 def make_session():
     s = requests.Session()
@@ -110,7 +148,7 @@ def make_session():
         "Referer":         BASE_URL,
     })
     try:
-        s.get(BASE_URL, timeout=15)   # seed cookies
+        s.get(BASE_URL, timeout=15)
     except Exception:
         pass
     return s
@@ -130,9 +168,10 @@ def fetch_page(session, page, retries=3):
     return None
 
 
-# ── Parse ─────────────────────────────────────────────────
+# Parse
 
-def parse_episodes(html, serial_offset):
+def parse_episodes(html):
+    """Return list of (series_title, series_href) — raw, not yet deduped."""
     soup = BeautifulSoup(html, "html.parser")
     results = []
     divs = soup.find_all(
@@ -147,41 +186,28 @@ def parse_episodes(html, serial_offset):
             a = li.find("a", href=True)
             if not a:
                 continue
-            strong = a.find("strong")
-            title  = strong.get_text(strip=True) if strong else a.get_text(strip=True)
-            href   = BASE_URL + a["href"]
-            results.append({
-                "serial_no":     serial_offset + len(results) + 1,
-                "episode_title": title,
-                "episode_href":  href,
-            })
+            strong    = a.find("strong")
+            raw_title = strong.get_text(strip=True) if strong else a.get_text(strip=True)
+            series_href  = to_series_url(BASE_URL + a["href"])
+            series_title = re.sub(
+                r"\s+[Ee]pisode\s+[\d]+(?:[.\-][\d]+)*\s*$", "", raw_title
+            ).strip()
+            results.append((series_title, series_href))
     return results
 
 
-# ── Main ──────────────────────────────────────────────────
+# Main
 
 def main():
     os.makedirs(DATA_DIR, exist_ok=True)
 
-    # ── Resolve page range ────────────────────────────────
-    # SCRAPER_START / SCRAPER_END are injected by the workflow.
-    # When running locally without them, fall back to state.json.
-    state = load_state()
-
+    state     = load_state()
     env_start = os.environ.get("SCRAPER_START", "").strip()
     env_end   = os.environ.get("SCRAPER_END",   "").strip()
 
-    if env_start != "":
-        start_page = int(env_start)
-    else:
-        start_page = state.get("next_page", 0)
+    start_page = int(env_start) if env_start else state.get("next_page", 0)
+    end_page   = int(env_end)   if env_end   else start_page + PAGES_PER_RUN - 1
 
-    if env_end != "":
-        end_page = int(env_end)
-    else:
-        end_page = start_page + PAGES_PER_RUN - 1
-
-    # Safety clamp
     start_page = max(0, min(start_page, MAX_PAGE))
     end_page   = max(start_page, min(end_page, MAX_PAGE))
 
@@ -189,30 +215,26 @@ def main():
         print(f"All pages up to {MAX_PAGE} already scraped.")
         sys.exit(0)
 
-    # ── When manual range is given, serial_no starts fresh
-    #    for that part; when auto-resuming, continue from state.
-    if env_start != "":
-        # Manual run: serial continues from global total so far
-        serial_offset = state.get("total_urls", 0)
-    else:
-        serial_offset = state.get("total_urls", 0)
-
-    current_part = state.get("part", 1)
+    serial_offset = state.get("total_urls", 0)
+    current_part  = state.get("part", 1)
 
     print(f"\n{'='*58}")
     print(f"  AnimeGG Scraper")
     print(f"{'='*58}")
-    print(f"  Page range  : {start_page} → {end_page}  "
-          f"({end_page - start_page + 1} pages)")
-    print(f"  URL range   : ?start={start_page*10} → ?start={end_page*10}")
+    print(f"  Page range  : {start_page} -> {end_page}  ({end_page - start_page + 1} pages)")
+    print(f"  URL range   : ?start={start_page*10} -> ?start={end_page*10}")
     print(f"  Serial off  : {serial_offset}")
     print(f"  Current part: animeg_part_{current_part}.json")
     print(f"{'='*58}\n")
+
+    seen_urls = load_processed_urls()
+    print(f"[dedup] {len(seen_urls)} unique series URLs in processed list\n")
 
     session      = make_session()
     buffer       = load_part(current_part)
     parts_used   = {current_part}
     urls_scraped = 0
+    dups_skipped = 0
     empty_streak = 0
 
     for page in range(start_page, end_page + 1):
@@ -225,61 +247,65 @@ def main():
             print("SKIPPED (fetch failed)")
             empty_streak += 1
         else:
-            episodes = parse_episodes(html, serial_offset)
+            raw           = parse_episodes(html)
+            new_this_page = 0
 
-            if not episodes:
+            for series_title, series_href in raw:
+                if series_href in seen_urls:
+                    dups_skipped += 1
+                    continue
+                seen_urls.add(series_href)
+                serial_offset += 1
+                urls_scraped  += 1
+                new_this_page += 1
+                buffer.append({
+                    "serial_no":    serial_offset,
+                    "series_title": series_title,
+                    "series_href":  series_href,
+                })
+
+                if len(buffer) % 100 == 0:
+                    if estimated_size(buffer) >= MAX_FILE_SIZE:
+                        save_part(current_part, buffer)
+                        size_kb = part_size(current_part) / 1024
+                        print(f"\n  -> [SPLIT] Part {current_part} "
+                              f"({size_kb:.0f} KB >= 3 MB) "
+                              f"-> starting part {current_part + 1}")
+                        current_part += 1
+                        parts_used.add(current_part)
+                        buffer = []
+
+            if not raw:
                 print("0 episodes")
                 empty_streak += 1
                 if empty_streak >= 5:
-                    print("\n[stop] 5 consecutive empty/failed pages — end of content.")
+                    print("\n[stop] 5 consecutive empty/failed pages -- end of content.")
                     break
             else:
                 empty_streak = 0
-                print(f"{len(episodes):>3} episodes | "
-                      f"serial {serial_offset+1}–{serial_offset+len(episodes)}")
+                print(f"{new_this_page:>3} new | "
+                      f"{len(raw) - new_this_page} dup | "
+                      f"serial up to {serial_offset}")
 
-                for ep in episodes:
-                    buffer.append(ep)
-                    serial_offset += 1
-                    urls_scraped  += 1
-
-                    # Check split every 100 entries (fast estimate)
-                    if len(buffer) % 100 == 0:
-                        if estimated_size(buffer) >= MAX_FILE_SIZE:
-                            save_part(current_part, buffer)
-                            size_kb = part_size(current_part) / 1024
-                            print(f"\n  ↳ [SPLIT] Part {current_part} "
-                                  f"({size_kb:.0f} KB ≥ 3 MB) "
-                                  f"→ starting part {current_part + 1}")
-                            current_part += 1
-                            parts_used.add(current_part)
-                            buffer = []
-
-        # Save after every page (crash-safe)
         save_part(current_part, buffer)
         parts_used.add(current_part)
-
-        # Update state after every page
-        save_state({
-            "next_page":  page + 1,
-            "part":       current_part,
-            "total_urls": serial_offset,
-        })
+        save_state({"next_page": page + 1, "part": current_part, "total_urls": serial_offset})
+        save_processed_urls(seen_urls)
 
         if page < end_page:
             time.sleep(DELAY)
 
-    # Final save & index
     save_part(current_part, buffer)
     update_index(parts_used)
 
     print(f"\n{'='*58}")
     print(f"  Done!")
-    print(f"  Pages scraped : {start_page} → {end_page}")
-    print(f"  URLs this run : {urls_scraped}")
-    print(f"  Total URLs    : {serial_offset}")
-    print(f"  Parts written : {sorted(parts_used)}")
-    print(f"  Next run page : {end_page + 1}")
+    print(f"  Pages scraped   : {start_page} -> {end_page}")
+    print(f"  New URLs        : {urls_scraped}")
+    print(f"  Duplicates skip : {dups_skipped}")
+    print(f"  Total unique    : {serial_offset}")
+    print(f"  Parts written   : {sorted(parts_used)}")
+    print(f"  Next run page   : {end_page + 1}")
     print(f"{'='*58}\n")
 
 
