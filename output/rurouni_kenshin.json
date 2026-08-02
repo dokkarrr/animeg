@@ -2,10 +2,11 @@
   {
     "mal_id": 45,
     "tmdb_id": 28136,
-    "title": "Watch Rurouni Kenshin Episode 1 | Subbed Dubbed Animegg",
+    "title": null,
     "episode_no": 1,
-    "sub": "https://www.animegg.org/embed/32203",
-    "dub": "https://www.animegg.org/embed/32204"
+    "sub": null,
+    "dub": null,
+    "error": "HTTPSConnectionPool(host='www.animegg.org', port=443): Read timed out. (read timeout=15)"
   },
   {
     "mal_id": 45,
