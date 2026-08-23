@@ -466,10 +466,11 @@
   {
     "mal_id": 45,
     "tmdb_id": 28136,
-    "title": "Watch Rurouni Kenshin Episode 59 | Subbed Dubbed Animegg",
+    "title": null,
     "episode_no": 59,
-    "sub": "https://www.animegg.org/embed/32291",
-    "dub": "https://www.animegg.org/embed/32292"
+    "sub": null,
+    "dub": null,
+    "error": "HTTPSConnectionPool(host='www.animegg.org', port=443): Read timed out. (read timeout=15)"
   },
   {
     "mal_id": 45,
@@ -482,26 +483,29 @@
   {
     "mal_id": 45,
     "tmdb_id": 28136,
-    "title": "Watch Rurouni Kenshin Episode 61 | Subbed Dubbed Animegg",
+    "title": null,
     "episode_no": 61,
-    "sub": "https://www.animegg.org/embed/32297",
-    "dub": "https://www.animegg.org/embed/32298"
+    "sub": null,
+    "dub": null,
+    "error": "HTTPSConnectionPool(host='www.animegg.org', port=443): Read timed out. (read timeout=15)"
   },
   {
     "mal_id": 45,
     "tmdb_id": 28136,
-    "title": "Watch Rurouni Kenshin Episode 62 | Subbed Dubbed Animegg",
+    "title": null,
     "episode_no": 62,
-    "sub": "https://www.animegg.org/embed/32299",
-    "dub": "https://www.animegg.org/embed/32300"
+    "sub": null,
+    "dub": null,
+    "error": "HTTPSConnectionPool(host='www.animegg.org', port=443): Read timed out. (read timeout=15)"
   },
   {
     "mal_id": 45,
     "tmdb_id": 28136,
-    "title": "Watch Rurouni Kenshin Episode 63 | Subbed Dubbed Animegg",
+    "title": null,
     "episode_no": 63,
-    "sub": "https://www.animegg.org/embed/32323",
-    "dub": "https://www.animegg.org/embed/32324"
+    "sub": null,
+    "dub": null,
+    "error": "HTTPSConnectionPool(host='www.animegg.org', port=443): Read timed out. (read timeout=15)"
   },
   {
     "mal_id": 45,
@@ -514,10 +518,11 @@
   {
     "mal_id": 45,
     "tmdb_id": 28136,
-    "title": "Watch Rurouni Kenshin Episode 65 | Subbed Dubbed Animegg",
+    "title": null,
     "episode_no": 65,
-    "sub": "https://www.animegg.org/embed/32303",
-    "dub": "https://www.animegg.org/embed/32304"
+    "sub": null,
+    "dub": null,
+    "error": "HTTPSConnectionPool(host='www.animegg.org', port=443): Read timed out. (read timeout=15)"
   },
   {
     "mal_id": 45,
@@ -530,10 +535,11 @@
   {
     "mal_id": 45,
     "tmdb_id": 28136,
-    "title": "Watch Rurouni Kenshin Episode 67 | Subbed Dubbed Animegg",
+    "title": null,
     "episode_no": 67,
-    "sub": "https://www.animegg.org/embed/32301",
-    "dub": "https://www.animegg.org/embed/32302"
+    "sub": null,
+    "dub": null,
+    "error": "HTTPSConnectionPool(host='www.animegg.org', port=443): Read timed out. (read timeout=15)"
   },
   {
     "mal_id": 45,
@@ -546,10 +552,11 @@
   {
     "mal_id": 45,
     "tmdb_id": 28136,
-    "title": "Watch Rurouni Kenshin Episode 69 | Subbed Dubbed Animegg",
+    "title": null,
     "episode_no": 69,
-    "sub": "https://www.animegg.org/embed/32309",
-    "dub": "https://www.animegg.org/embed/32310"
+    "sub": null,
+    "dub": null,
+    "error": "HTTPSConnectionPool(host='www.animegg.org', port=443): Read timed out. (read timeout=15)"
   },
   {
     "mal_id": 45,
@@ -562,10 +569,11 @@
   {
     "mal_id": 45,
     "tmdb_id": 28136,
-    "title": "Watch Rurouni Kenshin Episode 71 | Subbed Dubbed Animegg",
+    "title": null,
     "episode_no": 71,
-    "sub": "https://www.animegg.org/embed/32315",
-    "dub": "https://www.animegg.org/embed/32316"
+    "sub": null,
+    "dub": null,
+    "error": "HTTPSConnectionPool(host='www.animegg.org', port=443): Read timed out. (read timeout=15)"
   },
   {
     "mal_id": 45,
@@ -618,10 +626,11 @@
   {
     "mal_id": 45,
     "tmdb_id": 28136,
-    "title": "Watch Rurouni Kenshin Episode 78 | Subbed Dubbed Animegg",
+    "title": null,
     "episode_no": 78,
-    "sub": "https://www.animegg.org/embed/32331",
-    "dub": "https://www.animegg.org/embed/32332"
+    "sub": null,
+    "dub": null,
+    "error": "HTTPSConnectionPool(host='www.animegg.org', port=443): Read timed out. (read timeout=15)"
   },
   {
     "mal_id": 45,
